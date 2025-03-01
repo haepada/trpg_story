@@ -1,10 +1,10 @@
 import streamlit as st
-from modules.character_creation import character_creation_page
-from modules.game_play import game_play_page
-from modules.world_description import world_description_page
-from utils.theme_manager import setup_responsive_layout
-from config.constants import INITIAL_MASTER_MESSAGE
-from config.styles import apply_custom_styles
+from src.modules.character_creation import display_character_creation_page
+from src.modules.game_play import game_play_page
+from src.modules.world_description import world_description_page
+from src.utils.theme_manager import setup_responsive_layout
+from src.config.constants import INITIAL_MASTER_MESSAGE
+from src.config.styles import apply_custom_styles
 
 def initialize_session_state():
     """세션 상태 초기화 함수"""
@@ -87,9 +87,9 @@ def reset_game_session():
 
 def theme_selection_page():
     """테마 선택 페이지"""
-    from utils.theme_manager import create_theme_image, get_theme_description
-    from modules.world_generator import generate_world_description
-    from utils.location_manager import generate_locations
+    from src.utils.theme_manager import create_theme_image, get_theme_description
+    from src.modules.world_generator import generate_world_description
+    from src.utils.location_manager import generate_locations
     
     st.title("유니버스 원: 세상에서 하나뿐인 TRPG")
     
@@ -205,7 +205,7 @@ def main():
     elif st.session_state.stage == 'world_description':
         world_description_page()
     elif st.session_state.stage == 'character_creation':
-        character_creation_page()
+        display_character_creation_page()
     elif st.session_state.stage == 'game_play':
         game_play_page()
 
