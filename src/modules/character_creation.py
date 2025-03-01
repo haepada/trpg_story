@@ -1,12 +1,13 @@
+# character_creation.py 시작 부분 (임포트 부분)
 import streamlit as st
 import random
 import time
 from typing import Dict, List, Any, Tuple, Optional
 
-from config.constants import STATS_NAMES
-from utils.dice_roller import roll_dice, display_dice_animation
-from modules.ai_service import generate_character_options
-from modules.character_utils import extract_background_tags, get_stat_info
+from ..config.constants import ABILITY_NAMES
+from ..utils.dice_roller import roll_dice, display_dice_animation
+from ..modules.ai_service import generate_gemini_text
+from ..modules.character_utils import extract_background_tags, get_stat_info
 
 def initialize_character_creation_state():
     """캐릭터 생성 관련 상태 초기화"""
@@ -44,6 +45,105 @@ def display_character_creation_page():
     elif st.session_state.character_creation_step == 'review':
         display_character_review()
 
+def display_background_selection():
+    """배경 선택 UI"""
+    st.subheader("배경 이야기 선택")
+    
+    # 배경 선택 설명 추가
+    st.markdown("""
+    <div style='background-color: #1e2636; padding: 15px; border-radius: 5px; margin-bottom: 15px;'>
+        <p>캐릭터의 배경 이야기는 당신이 어떻게 모험가가 되었는지, 어떤 경험을 했는지를 설명합니다.</p>
+        <p>배경은 캐릭터의 동기와 성격을 형성하며, 게임 내에서의 역할 플레이에 큰 도움이 됩니다.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 선택된 종족 및 직업 정보 표시 (개선된 UI)
+    race_icon = st.session_state.get('race_icon', '👤')
+    profession_icon = st.session_state.get('profession_icon', '👤')
+    race_ability = st.session_state.get('race_ability', "특수 능력 없음")
+    profession_skill = st.session_state.get('profession_skill', "특수 기술 없음")
+    
+    st.markdown(f"""
+    <div style='background-color: #2a3549; padding: 15px; border-radius: 5px; margin-bottom: 15px; display: flex; align-items: center;'>
+        <div style='font-size: 2.5rem; margin-right: 15px;'>{race_icon}</div>
+        <div style='flex-grow: 1;'>
+            <h3 style='margin: 0; color: #4CAF50;'>{st.session_state.selected_race} {st.session_state.selected_profession}</h3>
+            <div style='margin-top: 5px; font-size: 0.9rem;'>
+                <strong>{st.session_state.selected_race}:</strong> {race_ability}
+            </div>
+            <div style='margin-top: 5px; font-size: 0.9rem;'>
+                <strong>{st.session_state.selected_profession}:</strong> {profession_skill}
+            </div>
+        </div>
+        <div style='font-size: 2.5rem;'>{profession_icon}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 배경 옵션 생성
+    if not st.session_state.background_options_generated:
+        with st.spinner("캐릭터 배경 옵션을 생성 중..."):
+            from src.modules.character_utils import generate_character_options
+            st.session_state.character_backgrounds = generate_character_options(
+                st.session_state.selected_profession, 
+                st.session_state.theme
+            )
+            st.session_state.background_options_generated = True
+    
+    # 생성된 배경 옵션 표시
+    if 'character_backgrounds' in st.session_state and st.session_state.character_backgrounds:
+        # 옵션 숫자 및 탭 생성
+        tabs = st.tabs([f"옵션 {i+1}" for i in range(len(st.session_state.character_backgrounds))])
+        
+        for i, (tab, background) in enumerate(zip(tabs, st.session_state.character_backgrounds)):
+            with tab:
+                # 각 배경 스토리 표시
+                st.markdown(f"""
+                <div style='background-color: #1e2636; padding: 15px; border-radius: 5px; margin-bottom: 15px;'>
+                    {background}
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # 배경 선택 버튼
+                if st.button(f"이 배경으로 선택", key=f"bg_select_{i}", use_container_width=True):
+                    # 선택한 배경 저장
+                    st.session_state.selected_background = background
+                    
+                    # 배경에서 태그 추출
+                    from src.modules.character_utils import extract_background_tags
+                    st.session_state.background_tags = extract_background_tags(background)
+                    
+                    # 다음 단계로 진행
+                    st.session_state.character_creation_step = 'abilities'
+                    st.session_state.master_message = f"흥미로운 배경이네요! 이제 당신의 능력치를 결정해 볼까요?"
+                    st.rerun()
+    else:
+        st.error("배경 옵션을 생성하는데 문제가 발생했습니다. 다시 시도해주세요.")
+    
+    # 직접 작성 옵션 추가
+    st.markdown("<div class='option-card'>", unsafe_allow_html=True)
+    st.write("### 직접 배경 작성하기")
+    st.write("원하는 배경 스토리를 직접 작성할 수 있습니다.")
+    
+    custom_background = st.text_area("당신의 캐릭터 배경 이야기를 작성하세요:", height=200)
+    
+    if st.button("이 배경으로 선택", key="custom_bg_select", use_container_width=True):
+        if custom_background:
+            # 선택한 배경 저장
+            st.session_state.selected_background = custom_background
+            
+            # 배경에서 태그 추출
+            from src.modules.character_utils import extract_background_tags
+            st.session_state.background_tags = extract_background_tags(custom_background)
+            
+            # 다음 단계로 진행
+            st.session_state.character_creation_step = 'abilities'
+            st.session_state.master_message = f"자신만의 배경 이야기를 만드셨군요! 이제 능력치를 결정해 볼까요?"
+            st.rerun()
+        else:
+            st.warning("배경 이야기를 입력해주세요.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+        
 def display_race_selection():
     """종족 선택 UI"""
     st.subheader("종족 선택")
@@ -57,11 +157,11 @@ def display_race_selection():
     """, unsafe_allow_html=True)
     
     # 종족 목록 가져오기
-    from modules.character_utils import generate_races
+    from src.modules.character_utils import generate_races
     races = generate_races(st.session_state.theme)
     
     # 종족별 아이콘 매핑
-    from modules.character_utils import RACE_ICONS, RACE_BONUSES, RACE_ABILITIES, RACE_DESCRIPTIONS
+    from src.modules.character_utils import RACE_ICONS, RACE_BONUSES, RACE_ABILITIES, RACE_DESCRIPTIONS
     
     # 종족 선택 버튼 표시 (개선된 카드 형식)
     race_cols = st.columns(3)
@@ -127,7 +227,7 @@ def display_race_selection():
     
     # 특수 능력 입력
     custom_ability = st.text_area("특수 능력 (선택사항):", 
-                                  placeholder="예: 어둠 속에서도 잘 볼 수 있는 능력")
+                                 placeholder="예: 어둠 속에서도 잘 볼 수 있는 능력")
     
     if custom_race and st.button("이 종족으로 선택"):
         st.session_state.selected_race = custom_race
@@ -139,7 +239,7 @@ def display_race_selection():
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
     
-    def display_profession_selection():
+def display_profession_selection():
     """직업 선택 UI"""
     st.subheader("직업 선택")
     
@@ -180,11 +280,11 @@ def display_race_selection():
     
     if profession_method == "기본 직업 선택":
         # 직업 목록 가져오기
-        from modules.character_utils import generate_professions
+        from src.modules.character_utils import generate_professions
         professions = generate_professions(st.session_state.theme)
         
         # 직업별 아이콘 및 정보 가져오기
-        from modules.character_utils import (
+        from src.modules.character_utils import (
             PROFESSION_ICONS, PROFESSION_STATS, 
             PROFESSION_EQUIPMENT, PROFESSION_SKILLS
         )
@@ -238,6 +338,7 @@ def display_race_selection():
                     st.session_state.character_creation_step = 'background'
                     st.session_state.master_message = f"{profession} 직업을 선택하셨군요! 이제 캐릭터의 배경 이야기를 선택해보세요."
                     st.rerun()
+                    
     else:  # 직접 직업 만들기
         st.markdown("<div class='option-card'>", unsafe_allow_html=True)
         st.write("### 나만의 직업 만들기")
@@ -295,6 +396,7 @@ def display_race_selection():
                 # 배경 옵션 생성 상태 확인
                 if not st.session_state.background_options_generated:
                     with st.spinner("캐릭터 배경 옵션을 생성 중..."):
+                        from src.modules.character_utils import generate_character_options
                         st.session_state.character_backgrounds = generate_character_options(
                             custom_profession, st.session_state.theme
                         )
