@@ -23,7 +23,7 @@ def setup_gemini():
     """
     try:
         # Streamlit Secrets에서 API 키 가져오기 
-        api_key = st.secrets.get(API_KEY_SECRET_NAME, None)
+        api_key = st.secrets.get(GEMINI_API_KEY, None)
         
         if not api_key:
             st.sidebar.error("API 키가 설정되지 않음")
