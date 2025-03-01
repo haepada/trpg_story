@@ -11,7 +11,7 @@ try:
 except ImportError:
     genai = None
 
-from config.constants import BACKUP_RESPONSES, API_KEY_SECRET_NAME
+from ..config.constants import BACKUP_RESPONSES, API_KEY_SECRET_NAME
 
 @st.cache_resource(ttl=3600)  # 1시간 캐싱
 def setup_gemini():
@@ -23,7 +23,7 @@ def setup_gemini():
     """
     try:
         # Streamlit Secrets에서 API 키 가져오기 
-        api_key = st.secrets.get(GEMINI_API_KEY, None)
+        api_key = st.secrets.get(API_KEY_SECRET_NAME, None)
         
         if not api_key:
             st.sidebar.error("API 키가 설정되지 않음")
@@ -145,3 +145,71 @@ def generate_gemini_text(prompt, max_tokens=500, retries=2, timeout=10):
     
     # 이 코드는 실행되지 않음 (위에서 항상 반환함)
     return BACKUP_RESPONSES["story"]
+
+def generate_character_options(profession, theme):
+    """
+    직업과 테마에 기반한 캐릭터 배경 옵션 생성
+    
+    Args:
+        profession (str): 선택한 직업
+        theme (str): 세계관 테마
+        
+    Returns:
+        list: 배경 스토리 옵션 목록
+    """
+    prompt = f"""
+    당신은 TRPG 게임 마스터입니다. '{theme}' 테마의 세계에서 '{profession}' 직업을 가진 
+    캐릭터의 3가지 다른 배경 스토리 옵션을 한국어로 제안해주세요. 
+
+    각 옵션은 다음 요소를 포함해야 합니다:
+
+    ## 삼위일체 구조
+    1. **배경 서사**: 캐릭터가 겪은 결정적 사건 3개
+    2. **도덕적 축**: 선택을 규정하는 2가지 원칙
+    3. **정체성 기반**: 타인에게 설명하는 5초 자기소개
+
+    ## 개성화를 위한 요소
+    - 캐릭터만의 독특한 특성이나 버릇
+    - 관계망 (가족, 멘토, 적대자 등)
+    - 물리적 특징이나 외형적 특성
+
+    ## 직업 연계성
+    - 이 캐릭터가 해당 직업을 가지게 된 이유
+    - 직업 관련 전문 기술이나 지식
+
+    각 옵션을 120단어 내외로 작성해주세요.
+    모든 문장은 완결된 형태로 작성하세요.
+    
+    다음 형식으로 반환해주세요:
+    
+    #옵션 1:
+    (첫 번째 배경 스토리)
+    
+    #옵션 2:
+    (두 번째 배경 스토리)
+    
+    #옵션 3:
+    (세 번째 배경 스토리)
+    """
+    
+    response = generate_gemini_text(prompt, 800)
+    
+    # 옵션 분리
+    options = []
+    current_option = ""
+    for line in response.split('\n'):
+        if line.startswith('#옵션') or line.startswith('# 옵션') or line.startswith('옵션'):
+            if current_option:
+                options.append(current_option.strip())
+            current_option = ""
+        else:
+            current_option += line + "\n"
+    
+    if current_option:
+        options.append(current_option.strip())
+    
+    # 옵션이 3개 미만이면 백업 옵션 추가
+    while len(options) < 3:
+        options.append(f"당신은 {profession}으로, 험난한 세계에서 살아남기 위해 기술을 연마했습니다. 특별한 재능을 가지고 있으며, 자신의 운명을 개척하고자 합니다.")
+    
+    return options[:3]  # 최대 3개까지만 반환
